@@ -225,32 +225,35 @@ export class ObjectifCommercialService {
       console.log(`  ${index + 1}. Commercial: ${obj.commercial?.nom} ${obj.commercial?.prenom} - Mission: ${obj.mission}`);
     });
 
-    const totalMontant = await this.commandeRepo
-      .createQueryBuilder('commande')
-      .where('commande.commercialId = :userId', { userId })
-      .select('SUM(commande.prix_total_ttc)', 'total')
-      .getRawOne();
+    // Calcul du réalisé pour chaque objectif (commandes validées sur la période de l'objectif, selon date de validation)
+    const result = await Promise.all(objectifsCommercial.map(async (obj) => {
+      const ventesResult = await this.commandeRepo
+        .createQueryBuilder('commande')
+        .where('commande.commercialId = :userId', { userId })
+        .andWhere('commande.statut = :statut', { statut: 'validee' })
+        .andWhere('commande.date_validation BETWEEN :dateDebut AND :dateFin', { dateDebut: obj.dateDebut, dateFin: obj.dateFin })
+        .select('SUM(commande.prix_total_ttc)', 'total')
+        .getRawOne();
 
-    const totalVentes = parseFloat(totalMontant?.total || '0');
-    console.log(`💰 Total ventes du commercial ${userId}: ${totalVentes}€`);
+      const ventes = parseFloat(ventesResult?.total || '0');
 
-    const result = objectifsCommercial.map((obj) => ({
-      id: obj.id,
-      mission: obj.mission,
-      dateDebut: obj.dateDebut,
-      dateFin: obj.dateFin,
-      prime: obj.prime,
-      ventes: totalVentes,
-      montantCible: obj.montantCible,
-      atteint: obj.montantCible ? totalVentes >= obj.montantCible : false,
-      isGlobal: false, // Toujours false car on ne récupère que les objectifs personnels
+      return {
+        id: obj.id,
+        mission: obj.mission,
+        dateDebut: obj.dateDebut,
+        dateFin: obj.dateFin,
+        prime: obj.prime,
+        ventes,
+        montantCible: obj.montantCible,
+        atteint: obj.montantCible ? ventes >= obj.montantCible : false,
+        isGlobal: false,
+      };
     }));
-    
+
     console.log(`✅ Retourne ${result.length} objectifs PERSONNELS pour le commercial ${userId}`);
     result.forEach((obj, index) => {
-      console.log(`  ${index + 1}. [PERSONNEL] ${obj.mission} - Cible: ${obj.montantCible}€`);
+      console.log(`  ${index + 1}. [PERSONNEL] ${obj.mission} - Cible: ${obj.montantCible}€ - Réalisé: ${obj.ventes}€`);
     });
-    
     return result;
   }
 
