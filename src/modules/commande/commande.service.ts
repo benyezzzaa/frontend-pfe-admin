@@ -37,6 +37,123 @@ import { Client } from '../client/client.entity';
   @InjectRepository(HistoriqueCommande)
   private historiqueCommandeRepository: Repository<HistoriqueCommande>,
     ) {}
+
+  /**
+   * Génère un numéro de commande unique et séquentiel
+   * Format: CMD-YYYY-XXXXX (ex: CMD-2025-00001)
+   */
+  private async generateUniqueNumeroCommande(): Promise<string> {
+    const currentYear = new Date().getFullYear();
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    while (attempts < maxAttempts) {
+      // Trouver la dernière commande de l'année en cours
+      const lastCommande = await this.commandeRepository
+        .createQueryBuilder('commande')
+        .where('commande.numero_commande LIKE :pattern', { 
+          pattern: `CMD-${currentYear}-%` 
+        })
+        .orderBy('commande.numero_commande', 'DESC')
+        .getOne();
+
+      let sequenceNumber = 1;
+      
+      if (lastCommande) {
+        // Extraire le numéro de séquence de la dernière commande
+        const match = lastCommande.numero_commande.match(new RegExp(`CMD-${currentYear}-(\\d+)`));
+        if (match) {
+          sequenceNumber = parseInt(match[1]) + 1;
+        }
+      }
+
+      // Ajouter un offset basé sur le timestamp pour éviter les conflits
+      const timestamp = Date.now();
+      const offset = (timestamp % 1000) + attempts;
+      sequenceNumber += offset;
+
+      // Formater le numéro de séquence avec des zéros (5 chiffres)
+      const formattedSequence = sequenceNumber.toString().padStart(5, '0');
+      const numeroCommande = `CMD-${currentYear}-${formattedSequence}`;
+
+      // Vérifier si ce numéro existe déjà
+      const existingCommande = await this.commandeRepository.findOne({
+        where: { numero_commande: numeroCommande }
+      });
+
+      if (!existingCommande) {
+        return numeroCommande;
+      }
+
+      attempts++;
+    }
+
+    // Si on arrive ici, utiliser un timestamp complet comme fallback
+    const timestamp = Date.now();
+    return `CMD-${currentYear}-${timestamp}`;
+  }
+
+  /**
+   * Nettoie et corrige les anciens numéros de commande incorrects
+   * Utile pour migrer les données existantes
+   */
+  async cleanOldCommandeNumbers(): Promise<{ updated: number }> {
+    const commandesWithBadNumbers = await this.commandeRepository
+      .createQueryBuilder('commande')
+      .where('commande.numero_commande LIKE :pattern1', { pattern1: '%[%' })
+      .orWhere('commande.numero_commande LIKE :pattern2', { pattern2: '%m%' })
+      .orWhere('commande.numero_commande NOT LIKE :pattern3', { pattern3: 'CMD-%' })
+      .getMany();
+
+    let updatedCount = 0;
+    
+    for (const commande of commandesWithBadNumbers) {
+      const newNumero = await this.generateUniqueNumeroCommande();
+      commande.numero_commande = newNumero;
+      await this.commandeRepository.save(commande);
+      updatedCount++;
+    }
+
+    return { updated: updatedCount };
+  }
+
+  /**
+   * Nettoie les numéros de commande en double
+   * Utile pour corriger les problèmes de contrainte unique
+   */
+  async fixDuplicateCommandeNumbers(): Promise<{ fixed: number, duplicates: any[] }> {
+    // Trouver les doublons
+    const duplicates = await this.commandeRepository
+      .createQueryBuilder('commande')
+      .select('commande.numero_commande')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('commande.numero_commande')
+      .having('COUNT(*) > 1')
+      .getRawMany();
+
+    let fixedCount = 0;
+
+    for (const duplicate of duplicates) {
+      const commandesWithSameNumber = await this.commandeRepository.find({
+        where: { numero_commande: duplicate.numero_commande },
+        order: { dateCreation: 'ASC' }
+      });
+
+      // Garder la première commande, corriger les autres
+      for (let i = 1; i < commandesWithSameNumber.length; i++) {
+        const commande = commandesWithSameNumber[i];
+        const newNumero = await this.generateUniqueNumeroCommande();
+        commande.numero_commande = newNumero;
+        await this.commandeRepository.save(commande);
+        fixedCount++;
+      }
+    }
+
+    return { 
+      fixed: fixedCount, 
+      duplicates: duplicates.map(d => ({ numero: d.numero_commande, count: parseInt(d.count) }))
+    };
+  }
   async generatePdf(id: number): Promise<Buffer> {
     const commande = await this.commandeRepository.findOne({
       where: { id },
@@ -115,8 +232,11 @@ async createCommande(dto: CreateCommandeDto, commercial: User): Promise<Commande
     throw new ForbiddenException('Seuls les commerciaux peuvent créer des commandes.');
   }
 
+  // Génération d'un numéro de commande unique et séquentiel
+  const numeroCommande = await this.generateUniqueNumeroCommande();
+
   const commande = this.commandeRepository.create({
-    numero_commande: dto.numeroCommande,
+    numero_commande: numeroCommande,
     commercial: commercial,
     client: { id: dto.clientId },
     statut: 'en_attente',
@@ -127,7 +247,38 @@ async createCommande(dto: CreateCommandeDto, commercial: User): Promise<Commande
     promotion: dto.promotionId ? { id: dto.promotionId } : undefined,
   });
 
-  const savedCommande = await this.commandeRepository.save(commande);
+  // Tentative de sauvegarde avec gestion des conflits de numéros
+  let savedCommande: Commande | null = null;
+  let attempts = 0;
+  const maxAttempts = 3;
+
+  while (attempts < maxAttempts) {
+    try {
+      savedCommande = await this.commandeRepository.save(commande);
+      break;
+    } catch (error) {
+      attempts++;
+      
+      // Si c'est une erreur de contrainte unique sur numero_commande
+      if (error.code === '23505' && error.constraint === 'UQ_a7f83d06c017678ec4cb3628ffb') {
+        if (attempts >= maxAttempts) {
+          throw new BadRequestException('Impossible de générer un numéro de commande unique. Veuillez réessayer.');
+        }
+        
+        // Régénérer un nouveau numéro de commande
+        commande.numero_commande = await this.generateUniqueNumeroCommande();
+        continue;
+      }
+      
+      // Si c'est une autre erreur, la relancer
+      throw error;
+    }
+  }
+
+  // Vérifier que la commande a été sauvegardée
+  if (!savedCommande) {
+    throw new BadRequestException('Erreur lors de la sauvegarde de la commande.');
+  }
 
   let totalHT = 0;
   let totalTVA = 0;

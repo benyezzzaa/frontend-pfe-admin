@@ -10,7 +10,8 @@ import {
   Query,
   UseGuards,
   Put,
-  ParseIntPipe
+  ParseIntPipe,
+  Request
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -62,12 +63,13 @@ export class UsersController {
 
   // ✅ Modifier un utilisateur
  @Put(':id')
-  @SetRoles('admin')
+  @SetRoles('admin', 'commercial')
   async updateUser(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateUserDto: UpdateUserDto,
+    @Request() req,
   ) {
-    return this.usersService.updateUser(id, updateUserDto);
+    return this.usersService.updateUser(id, updateUserDto, req.user);
   }
 
   // ✅ Modifier la position (latitude, longitude)
@@ -87,5 +89,16 @@ export class UsersController {
   @ApiOperation({ summary: 'Obtenir la position de tous les commerciaux' })
   getCommercialsWithPosition() {
     return this.usersService.getAllCommercialsWithPosition();
+  }
+
+  // ✅ Endpoint pour que le commercial modifie son propre profil
+  @Put('profile')
+  @SetRoles('commercial')
+  @ApiOperation({ summary: 'Modifier son propre profil (commercial)' })
+  async updateOwnProfile(
+    @Request() req,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
+    return this.usersService.updateOwnProfile(req.user.id, updateUserDto);
   }
 }

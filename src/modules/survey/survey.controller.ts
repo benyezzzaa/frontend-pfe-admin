@@ -1,8 +1,9 @@
-import { Controller, Post, Body, Param, Get, Put, Query } from '@nestjs/common';
+import { Controller, Post, Body, Param, Get, Put, Query, Res } from '@nestjs/common';
 import { SurveyService } from './survey.service';
 import { CreateSurveyDto } from './dto/create-survey.dto';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { CreateAffectationDto } from './dto/create-affectation.dto';
+import { Response } from 'express';
 
 @Controller('enquetes')
 export class SurveyController {
@@ -46,5 +47,11 @@ export class SurveyController {
   @Get('affectees')
   getAffectees(@Query('commercialId') commercialId: number) {
     return this.surveyService.getEnquetesAffecteesCommercial(commercialId);
+  }
+
+  // ✅ Endpoint pour télécharger le PDF d'une enquête
+  @Get(':id/pdf')
+  async getSurveyPdf(@Param('id') id: number, @Res() res: Response) {
+    return this.surveyService.generateSurveyPdf(+id, res);
   }
 } 

@@ -77,6 +77,20 @@ async updateCommande(
     return this.commandeService.deleteCommande(id);
   }
 
+  @Post('clean-numbers')
+  @SetRoles('admin')
+  @ApiOperation({ summary: 'Nettoyer les anciens numéros de commande incorrects' })
+  async cleanOldCommandeNumbers() {
+    return this.commandeService.cleanOldCommandeNumbers();
+  }
+
+  @Post('fix-duplicates')
+  @SetRoles('admin')
+  @ApiOperation({ summary: 'Corriger les numéros de commande en double' })
+  async fixDuplicateCommandeNumbers() {
+    return this.commandeService.fixDuplicateCommandeNumbers();
+  }
+
   @Delete('rejeter/:id')
   @SetRoles('admin')
   @ApiOperation({ summary: 'Rejeter une commande (marquer comme rejetée au lieu de supprimer)' })

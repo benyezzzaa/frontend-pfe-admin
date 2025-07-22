@@ -122,15 +122,26 @@ export class UsersService {
     });
   }
 
-  async updateUser(id: number, updateUserDto: UpdateUserDto) {
+  async updateUser(id: number, updateUserDto: UpdateUserDto, currentUser?: any) {
     const user = await this.userRepository.findOneBy({ id });
 
     if (!user) {
       throw new NotFoundException('Utilisateur non trouvé');
     }
 
-    if (user.role === 'commercial' && updateUserDto.role === 'admin') {
-      throw new BadRequestException("Un commercial ne peut pas être promu administrateur.");
+    // Si c'est un commercial, il ne peut modifier que son propre profil
+    if (currentUser && currentUser.role === 'commercial' && currentUser.id !== id) {
+      throw new BadRequestException("Vous ne pouvez modifier que votre propre profil.");
+    }
+
+    // Si c'est un commercial, empêcher la modification du rôle
+    if (currentUser && currentUser.role === 'commercial' && updateUserDto.role && updateUserDto.role !== user.role) {
+      throw new BadRequestException("Vous ne pouvez pas modifier votre rôle.");
+    }
+
+    // Si c'est un commercial, empêcher la modification du mot de passe via cet endpoint
+    if (currentUser && currentUser.role === 'commercial') {
+      delete updateUserDto.password;
     }
 
     if (updateUserDto.adresse && updateUserDto.adresse !== user.adresse) {
@@ -146,6 +157,12 @@ export class UsersService {
     // Nettoyer le numéro de téléphone des espaces si fourni
     if (updateUserDto.tel) {
       updateUserDto.tel = updateUserDto.tel.replace(/\s+/g, '');
+    }
+
+    // Hasher le mot de passe s'il est fourni (seulement pour les admins)
+    if (updateUserDto.password && (!currentUser || currentUser.role === 'admin')) {
+      const salt = await bcrypt.genSalt();
+      updateUserDto.password = await bcrypt.hash(updateUserDto.password, salt);
     }
 
     Object.assign(user, updateUserDto);
@@ -183,5 +200,30 @@ export class UsersService {
       where: { role: 'commercial', isActive: true },
       select: ['id', 'nom', 'prenom', 'latitude', 'longitude'],
     });
+  }
+
+  // ✅ Méthode pour que le commercial modifie son propre profil
+  async updateOwnProfile(userId: number, updateUserDto: UpdateUserDto) {
+    const user = await this.userRepository.findOneBy({ id: userId });
+
+    if (!user) {
+      throw new NotFoundException('Utilisateur non trouvé');
+    }
+
+    // Empêcher la modification du rôle
+    if (updateUserDto.role && updateUserDto.role !== user.role) {
+      throw new BadRequestException("Vous ne pouvez pas modifier votre rôle.");
+    }
+
+    // Nettoyer le numéro de téléphone des espaces si fourni
+    if (updateUserDto.tel) {
+      updateUserDto.tel = updateUserDto.tel.replace(/\s+/g, '');
+    }
+
+    // Ne pas permettre la modification du mot de passe via cet endpoint
+    delete updateUserDto.password;
+
+    Object.assign(user, updateUserDto);
+    return this.userRepository.save(user);
   }
 }

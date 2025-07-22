@@ -11,8 +11,9 @@ class LigneCommandeDto {
 }
 
 export class CreateCommandeDto {
+  @IsOptional()
   @IsString()
-  numeroCommande: string;
+  numeroCommande?: string; // Optionnel car généré côté serveur
 
   @IsNumber()
   clientId: number; // ✅ Ajout ici

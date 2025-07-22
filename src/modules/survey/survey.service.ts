@@ -101,68 +101,224 @@ export class SurveyService {
 
     // En-tête PDF
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=enquete_${surveyId}.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename=enquete_${surveyId}_${survey.nom.replace(/\s+/g, '_')}.pdf`);
     doc.pipe(res);
 
-    // Titre
-    doc.moveDown(1.5);
-    doc.fontSize(22).fillColor('#3F51B5').text(survey.nom, { align: 'center', underline: true });
+    // ===== EN-TÊTE PROFESSIONNEL =====
+    
+    // Logo/En-tête de l'entreprise
+    doc.rect(40, 40, 515, 80).stroke('#3F51B5');
+    doc.fillColor('#3F51B5').fill();
+    doc.rect(40, 40, 515, 80).stroke('#3F51B5');
+    
+    // Titre principal
+    doc.fillColor('white')
+       .fontSize(24)
+       .font('Helvetica-Bold')
+       .text('DIGITAL PROCESS', 50, 55, { align: 'center', width: 495 });
+    
+    // Sous-titre
+    doc.fontSize(14)
+       .font('Helvetica')
+       .text('Force de Vente - Enquête de Satisfaction', 50, 85, { align: 'center', width: 495 });
+    
+    // Informations de contact
+    doc.fontSize(10)
+       .text('📧 contact@digitalprocess.com | 📞 +216 XX XXX XXX | 🌐 www.digitalprocess.com', 50, 105, { align: 'center', width: 495 });
+    
+    // ===== INFORMATIONS DE L'ENQUÊTE =====
+    doc.moveDown(3);
+    
+    // Titre de l'enquête
+    doc.fillColor('#2E3440')
+       .fontSize(20)
+       .font('Helvetica-Bold')
+       .text(survey.nom, { align: 'center', underline: true });
+    
     doc.moveDown(0.5);
+    
+    // Période de l'enquête
+    doc.fillColor('#5E81AC')
+       .fontSize(14)
+       .font('Helvetica-Bold')
+       .text('📅 Période de l\'enquête :', 50, doc.y);
+    
+    doc.fillColor('#4C566A')
+       .fontSize(12)
+       .font('Helvetica')
+       .text(`Du ${new Date(survey.dateDebut).toLocaleDateString('fr-FR')} au ${new Date(survey.dateFin).toLocaleDateString('fr-FR')}`, 50, doc.y + 5);
+    
+    doc.moveDown(1);
+    
+    // ===== INFORMATIONS GÉNÉRALES =====
+    doc.fillColor('#5E81AC')
+       .fontSize(14)
+       .font('Helvetica-Bold')
+       .text('📋 Informations générales :', 50, doc.y);
+    
+    doc.fillColor('#4C566A')
+       .fontSize(11)
+       .font('Helvetica')
+       .text(`• Enquête créée le : ${new Date(survey.createdAt).toLocaleDateString('fr-FR')}`, 60, doc.y + 5);
+    doc.text(`• Nombre de questions : ${survey.questions?.length || 0}`, 60, doc.y + 3);
+    doc.text(`• Statut : En cours`, 60, doc.y + 3);
+    
+    doc.moveDown(1);
+    
+    // Ligne de séparation
+    doc.moveTo(50, doc.y)
+       .lineTo(545, doc.y)
+       .stroke('#3F51B5');
+    
+    doc.moveDown(1);
 
-    // Dates
-    doc.fontSize(13).fillColor('black').text(`Du ${survey.dateDebut} au ${survey.dateFin}`, { align: 'center' });
-    doc.moveDown(1.5);
-
-    // Questions
-    doc.fontSize(16).fillColor('#222').text('Questions :', { underline: true });
+    // ===== SECTION DES QUESTIONS =====
+    doc.fillColor('#2E3440')
+       .fontSize(18)
+       .font('Helvetica-Bold')
+       .text('📝 Questions de l\'enquête', { underline: true });
+    
     doc.moveDown(0.5);
 
     if (survey.questions && survey.questions.length > 0) {
       survey.questions.forEach((q, i) => {
+        // Définir les couleurs et labels selon le type
         let typeLabel = '';
-        let color = '#888';
+        let color = '#5E81AC';
+        let icon = '❓';
+        
         switch (q.type) {
           case 'text':
-            typeLabel = 'Texte libre';
-            color = '#1976D2';
+            typeLabel = 'Réponse libre';
+            color = '#88C0D0';
+            icon = '✏️';
             break;
           case 'image':
-            typeLabel = 'Image';
-            color = '#388E3C';
+            typeLabel = 'Réponse avec image';
+            color = '#A3BE8C';
+            icon = '🖼️';
             break;
           case 'select':
             typeLabel = 'Oui / Non';
-            color = '#F57C00';
+            color = '#EBCB8B';
+            icon = '✅';
             break;
           default:
             typeLabel = q.type;
+            icon = '❓';
         }
-        doc
-          .moveDown(0.5)
-          .fontSize(13)
-          .fillColor('black')
-          .text(`${i + 1}. ${q.text}`)
-          .moveDown(0.1)
-          .fontSize(11)
-          .fillColor(color)
-          .text(`Type de réponse : ${typeLabel}`, { indent: 20 });
-        doc.moveDown(0.2);
-        // Ligne pour la réponse (pour impression papier)
+        
+        // Numéro et question
+        doc.fillColor('#2E3440')
+           .fontSize(14)
+           .font('Helvetica-Bold')
+           .text(`Question ${i + 1}`, 50, doc.y);
+        
+        doc.fillColor('#4C566A')
+           .fontSize(12)
+           .font('Helvetica')
+           .text(q.text, 50, doc.y + 5, { width: 495, align: 'justify' });
+        
+        doc.moveDown(0.3);
+        
+        // Type de réponse avec icône
+        doc.fillColor(color)
+           .fontSize(10)
+           .font('Helvetica-Bold')
+           .text(`${icon} Type de réponse : ${typeLabel}`, 60, doc.y);
+        
+        doc.moveDown(0.5);
+        
+        // Espace pour la réponse
+        doc.rect(60, doc.y, 435, 30).stroke('#D8DEE9');
+        doc.fillColor('#ECEFF4')
+           .fontSize(10)
+           .font('Helvetica')
+           .text('Espace pour votre réponse...', 65, doc.y + 10);
+        
+        // Lignes pour la réponse selon le type
         if (q.type === 'text') {
-          doc.fillColor('#aaa').text('Réponse : ___________________________________________', { indent: 20 });
+          doc.fillColor('#D8DEE9')
+             .moveTo(65, doc.y + 15)
+             .lineTo(485, doc.y + 15)
+             .stroke();
+          doc.fillColor('#D8DEE9')
+             .moveTo(65, doc.y + 20)
+             .lineTo(485, doc.y + 20)
+             .stroke();
         } else if (q.type === 'select') {
-          doc.fillColor('#aaa').text('Réponse : Oui   /   Non', { indent: 20 });
+          doc.fillColor('#4C566A')
+             .fontSize(10)
+             .font('Helvetica')
+             .text('☐ Oui    ☐ Non', 65, doc.y + 10);
         } else if (q.type === 'image') {
-          doc.fillColor('#aaa').text('Réponse : [Espace pour coller ou dessiner une image]', { indent: 20 });
+          doc.fillColor('#4C566A')
+             .fontSize(10)
+             .font('Helvetica')
+             .text('[Espace pour coller ou dessiner une image]', 65, doc.y + 10);
         }
+        
+        doc.moveDown(1.5);
       });
     } else {
-      doc.moveDown().fontSize(12).fillColor('red').text('Aucune question pour cette enquête.');
+      doc.fillColor('#BF616A')
+         .fontSize(12)
+         .font('Helvetica-Bold')
+         .text('⚠️ Aucune question définie pour cette enquête.', { align: 'center' });
     }
 
-    // Pied de page
+    // ===== PIED DE PAGE PROFESSIONNEL =====
     doc.moveDown(2);
-    doc.fontSize(10).fillColor('#888').text('Généré par Digital Process - Force de Vente', { align: 'center' });
+    
+    // Ligne de séparation
+    doc.moveTo(50, doc.y)
+       .lineTo(545, doc.y)
+       .stroke('#3F51B5');
+    
+    doc.moveDown(0.5);
+    
+    // Informations de retour
+    doc.fillColor('#5E81AC')
+       .fontSize(12)
+       .font('Helvetica-Bold')
+       .text('📤 Retour de l\'enquête :', 50, doc.y);
+    
+    doc.fillColor('#4C566A')
+       .fontSize(10)
+       .font('Helvetica')
+       .text('• Par email : contact@digitalprocess.com', 60, doc.y + 5);
+    doc.text('• Par téléphone : +216 XX XXX XXX', 60, doc.y + 3);
+    doc.text('• Date limite de retour : ' + new Date(survey.dateFin).toLocaleDateString('fr-FR'), 60, doc.y + 3);
+    
+    doc.moveDown(1);
+    
+    // Note de confidentialité
+    doc.fillColor('#8FBCBB')
+       .fontSize(9)
+       .font('Helvetica')
+       .text('🔒 Vos réponses sont confidentielles et seront utilisées uniquement pour améliorer nos services.', 50, doc.y, { width: 495, align: 'center' });
+    
+    doc.moveDown(0.5);
+    
+    // Signature et date
+    doc.fillColor('#4C566A')
+       .fontSize(10)
+       .font('Helvetica')
+       .text('Signature du client : _________________________', 50, doc.y);
+    doc.text('Date : _________________________', 300, doc.y);
+    
+    doc.moveDown(1);
+    
+    // Pied de page final
+    doc.fillColor('#3F51B5')
+       .fontSize(8)
+       .font('Helvetica-Bold')
+       .text('DIGITAL PROCESS - Force de Vente | Généré le ' + new Date().toLocaleDateString('fr-FR'), { align: 'center' });
+    
+    doc.fillColor('#6B7280')
+       .fontSize(7)
+       .font('Helvetica')
+       .text('📧 contact@digitalprocess.com | 🌐 www.digitalprocess.com | 📞 +216 XX XXX XXX', { align: 'center' });
 
     doc.end();
   }
