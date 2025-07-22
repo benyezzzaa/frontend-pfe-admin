@@ -432,15 +432,45 @@ async marquerCommandeCommeModifiee(commandeId: number, modifiePar: User, champ: 
     commande.date_validation = new Date();
     return this.commandeRepository.save(commande);
   }
-    
 
-    async deleteCommande(id: number) {
+  async rejeterCommande(id: number, motifRejet: string) {
+    const commande = await this.commandeRepository.findOne({ where: { id } });
+    if (!commande) {
+      throw new NotFoundException('Commande introuvable');
+    }
+    commande.statut = 'rejetee';
+    commande.motif_rejet = motifRejet;
+    return this.commandeRepository.save(commande);
+  }
+
+  async deleteCommande(id: number) {
       const commande = await this.commandeRepository.findOneBy({ id });
       if (!commande) {
         throw new NotFoundException('Commande introuvable');
       }
-      return this.commandeRepository.remove(commande);
+      // Au lieu de supprimer, marquer comme rejetée
+      commande.statut = 'rejetee';
+      commande.motif_rejet = 'Commande supprimée par l\'administrateur';
+      
+      // Enregistrer dans l'historique
+      await this.marquerCommandeCommeModifiee(
+        commande.id,
+        { id: 1 } as User, // ID de l'admin par défaut
+        'Statut',
+        commande.statut,
+        'rejetee'
+      );
+      
+      return this.commandeRepository.save(commande);
     }
+
+  async deleteCommandeDefinitivement(id: number) {
+    const commande = await this.commandeRepository.findOneBy({ id });
+    if (!commande) {
+      throw new NotFoundException('Commande introuvable');
+    }
+    return this.commandeRepository.remove(commande);
+  }
   // commande.service.ts
 
   async recalculerTotauxCommande(commandeId: number): Promise<void> {
@@ -473,5 +503,15 @@ async marquerCommandeCommeModifiee(commandeId: number, modifiePar: User, champ: 
     await this.commandeRepository.save(commande);
   }
 
+  async getCommandesRejeteesPourCommercial(commercialId: number): Promise<Commande[]> {
+    return this.commandeRepository.find({
+      where: {
+        commercial: { id: commercialId },
+        statut: 'rejetee',
+      },
+      relations: ['client', 'lignesCommande', 'lignesCommande.produit', 'promotion'],
+      order: { dateCreation: 'DESC' },
+    });
+  }
 
   }

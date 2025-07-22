@@ -63,10 +63,33 @@ async updateCommande(
     return this.commandeService.validerCommande(+id);
   }
 
+  @Put('rejeter/:id')
+  @SetRoles('admin')
+  @ApiOperation({ summary: 'Rejeter une commande (admin)' })
+  rejeterCommande(@Param('id') id: number, @Body() body: { motif_rejet: string }) {
+    return this.commandeService.rejeterCommande(+id, body.motif_rejet);
+  }
+
   @Delete(':id')
   @SetRoles('admin')
+  @ApiOperation({ summary: 'Supprimer définitivement une commande' })
   async deleteCommande(@Param('id') id: number) {
     return this.commandeService.deleteCommande(id);
+  }
+
+  @Delete('rejeter/:id')
+  @SetRoles('admin')
+  @ApiOperation({ summary: 'Rejeter une commande (marquer comme rejetée au lieu de supprimer)' })
+  async rejeterCommandeViaDelete(@Param('id') id: number, @Body() body: { motif_rejet?: string }) {
+    const motif = body.motif_rejet || 'Commande rejetée par l\'administrateur';
+    return this.commandeService.rejeterCommande(+id, motif);
+  }
+
+  @Delete('definitif/:id')
+  @SetRoles('admin')
+  @ApiOperation({ summary: 'Supprimer définitivement une commande (irréversible)' })
+  async deleteCommandeDefinitivement(@Param('id') id: number) {
+    return this.commandeService.deleteCommandeDefinitivement(id);
   }
 
   @Get('bande/:id')
@@ -79,6 +102,13 @@ async updateCommande(
   @SetRoles('admin', 'commercial')
   async getCommandesValidees() {
     return this.commandeService.getCommandesValidees();
+  }
+
+  @Get('rejetees')
+  @SetRoles('commercial')
+  @ApiOperation({ summary: 'Récupérer les commandes rejetées par l\'admin' })
+  async getCommandesRejetees(@Req() req) {
+    return this.commandeService.getCommandesRejeteesPourCommercial(req.user.id);
   }
 
   @Get('pdf/:id')

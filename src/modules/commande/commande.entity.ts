@@ -55,6 +55,9 @@ export class Commande {
   @Column({ default: false })
   estModifieParAdmin: boolean;
 
+  @Column({ nullable: true })
+  motif_rejet: string;
+
   @OneToMany(() => HistoriqueCommande, h => h.commande)
   historique: HistoriqueCommande[];
 }

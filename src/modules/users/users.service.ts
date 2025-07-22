@@ -61,12 +61,15 @@ export class UsersService {
       throw new BadRequestException("Adresse invalide ou non trouvée");
     }
 
+    // Nettoyer le numéro de téléphone des espaces
+    const cleanTel = createUserDto.tel ? createUserDto.tel.replace(/\s+/g, '') : undefined;
+
     const commercial = this.userRepository.create({
       nom: createUserDto.nom,
       prenom: createUserDto.prenom,
       email: createUserDto.email,
       password: hashedPassword,
-      tel: createUserDto.tel,
+      tel: cleanTel,
       adresse: createUserDto.adresse,
       latitude: coords.lat,
       longitude: coords.lon,
@@ -84,8 +87,12 @@ export class UsersService {
     const salt = await bcrypt.genSalt();
     const hashed = await bcrypt.hash(dto.password, salt);
 
+    // Nettoyer le numéro de téléphone des espaces
+    const cleanTel = dto.tel ? dto.tel.replace(/\s+/g, '') : undefined;
+
     const admin = this.userRepository.create({
       ...dto,
+      tel: cleanTel,
       password: hashed,
       role: 'admin',
     });
@@ -134,6 +141,11 @@ export class UsersService {
       } catch (error) {
         throw new BadRequestException("Adresse invalide ou non trouvée");
       }
+    }
+
+    // Nettoyer le numéro de téléphone des espaces si fourni
+    if (updateUserDto.tel) {
+      updateUserDto.tel = updateUserDto.tel.replace(/\s+/g, '');
     }
 
     Object.assign(user, updateUserDto);

@@ -26,10 +26,10 @@ longitude?: number;
   @IsString()
   email?: string;
 
-   @ApiProperty({ example: '0612345678', description: 'Numéro français valide (0XXXXXXXXX ou +33XXXXXXXXX)' })
+   @ApiProperty({ example: '06 12 34 56 78', description: 'Numéro français valide (avec ou sans espaces)' })
 @IsString()
 @Matches(/^(?:\+33|0)[1-9]\d{8}$/, {
-  message: 'Le numéro de téléphone doit être un numéro français valide (ex: 0612345678 ou +33612345678).',
+  message: 'Le numéro de téléphone doit être un numéro français valide (ex: 06 12 34 56 78 ou +33 6 12 34 56 78).',
 })
 telephone: string;
 

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Unite } from './unite.entity';
@@ -44,11 +44,29 @@ export class UniteService {
     return unite;
   }
 
-  async update(id: number, dto: CreateUniteDto): Promise<Unite> {
-    const unite = await this.findOne(id);
-    Object.assign(unite, dto);
-    return await this.uniteRepository.save(unite);
+async update(id: number, dto: CreateUniteDto): Promise<Unite> {
+  const unite = await this.findOne(id);
+
+  // Vérifie s’il existe déjà une unité avec le même nom (autre que celle qu’on modifie)
+  const existing = await this.uniteRepository
+    .createQueryBuilder('u')
+    .where('LOWER(u.nom) = LOWER(:nom)', { nom: dto.nom.trim() })
+    .andWhere('u.id != :id', { id })
+    .getOne();
+
+  if (existing) {
+    throw new BadRequestException(`Une autre unité avec le nom "${dto.nom}" existe déjà.`);
   }
+
+  Object.assign(unite, dto);
+
+  try {
+    return await this.uniteRepository.save(unite);
+  } catch (error) {
+    console.error('❌ Erreur lors de la mise à jour :', error);
+    throw new Error("Erreur lors de la mise à jour de l'unité");
+  }
+}
 async toggleStatus(id: number, isActive: boolean): Promise<Unite> {
   const unite = await this.findOne(id);
   unite.isActive = isActive;

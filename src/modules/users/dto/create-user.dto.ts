@@ -23,11 +23,11 @@ export class CreateUserDto {
 
  
 
-   @ApiProperty({ example: '0612345678', description: 'Numéro français valide' })
+   @ApiProperty({ example: '06 12 34 56 78', description: 'Numéro français valide (avec ou sans espaces)' })
   @IsOptional()
   @IsString()
-  @Matches(/^(?:\+33|0)[1-9]\d{8}$/, {
-    message: 'Le numéro de téléphone doit être un numéro français valide (ex: 0612345678 ou +33612345678).',
+  @Matches(/^(?:\+33|0)[1-9][\d\s\-\.]{8,}$/, {
+    message: 'Le numéro de téléphone doit être un numéro français valide (ex: 06 12 34 56 78 ou +33 6 12 34 56 78).',
   })
   tel?: string;
 

@@ -36,8 +36,12 @@ export class ClientService {
       if (!categorie) throw new NotFoundException('Catégorie non trouvée');
     }
 
+    // Nettoyer le numéro de téléphone des espaces
+    const cleanTelephone = dto.telephone ? dto.telephone.replace(/\s+/g, '') : dto.telephone;
+
     const client = this.clientRepository.create({
       ...dto,
+      telephone: cleanTelephone,
       commercial: user,
       ...(categorie ? { categorie } : {}),
     });
@@ -85,6 +89,11 @@ export class ClientService {
 
     if (user.role === 'commercial' && client.commercial?.id !== user.id) {
       throw new ForbiddenException('Vous ne pouvez modifier que vos propres clients.');
+    }
+
+    // Nettoyer le numéro de téléphone des espaces
+    if (dto.telephone) {
+      dto.telephone = dto.telephone.replace(/\s+/g, '');
     }
 
     Object.assign(client, dto);
