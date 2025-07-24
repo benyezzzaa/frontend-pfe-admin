@@ -30,7 +30,10 @@ export class ReclamationService {
   }
 
   findAll(): Promise<Reclamation[]> {
-    return this.repo.find({ order: { date: 'DESC' } });
+    return this.repo.find({ 
+      relations: ['user', 'client'],
+      order: { date: 'DESC' } 
+    });
   }
 
   findByUser(userId: number): Promise<Reclamation[]> {
@@ -54,7 +57,10 @@ findOpen(): Promise<Reclamation[]> {
   });
 }
   async updateStatus(id: number, status: string): Promise<Reclamation> {
-    const rec = await this.repo.findOneBy({ id });
+    const rec = await this.repo.findOne({
+      where: { id },
+      relations: ['user', 'client']
+    });
     if (!rec) throw new NotFoundException('Réclamation introuvable');
 
     rec.status = status;

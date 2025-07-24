@@ -45,10 +45,10 @@ prix_unitaire_ttc: number;
   categorie: CategorieProduit;
 
   @Column()
-  uniteId: string;
+  uniteId: number;
 
   @ManyToOne(() => Unite, (unite) => unite.produits, { eager: true })
-  @JoinColumn({ name: 'uniteId', referencedColumnName: 'nom' })
+  @JoinColumn({ name: 'uniteId', referencedColumnName: 'id' })
   unite: Unite;
 
   @OneToMany(() => LigneCommande, (ligne) => ligne.produit)

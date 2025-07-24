@@ -59,12 +59,11 @@ async update(id: number, dto: CreateUniteDto): Promise<Unite> {
   }
 
   Object.assign(unite, dto);
-
+ 
   try {
     return await this.uniteRepository.save(unite);
-  } catch (error) {
-    console.error('❌ Erreur lors de la mise à jour :', error);
-    throw new Error("Erreur lors de la mise à jour de l'unité");
+   } catch (error) {
+     throw new Error("Erreur lors de la mise à jour de l'unité");
   }
 }
 async toggleStatus(id: number, isActive: boolean): Promise<Unite> {

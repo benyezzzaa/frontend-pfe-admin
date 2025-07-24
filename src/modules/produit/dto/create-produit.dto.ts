@@ -37,5 +37,5 @@ colisage: number;
 
   @IsNotEmpty()
   @IsString()
-  uniteId: string; // ⚠️ string car c'est le nom de l'unité
+  uniteId: number; // ⚠️ string car c'est le nom de l'unité
 }

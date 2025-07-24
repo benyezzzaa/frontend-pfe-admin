@@ -35,7 +35,7 @@ export class ProduitService {
 
     const unite = await this.uniteRepository
       .createQueryBuilder('unite')
-      .where('LOWER(unite.nom) = LOWER(:nom)', { nom: dto.uniteId })
+      .where(' id  =  :id ', { id: dto.uniteId })
       .getOne();
 
     if (!unite) {
@@ -58,7 +58,7 @@ export class ProduitService {
       tva: dto.tva,
       colisage: dto.colisage,
       images: imageFilenames ?? [],
-      uniteId: unite.nom,
+      uniteId: unite.id,
       categorieId: categorie.id,
     });
 
@@ -88,27 +88,19 @@ export class ProduitService {
     ((produit.prix_unitaire) * (1 + produit.tva / 100)).toFixed(2)
   );
 
-  if (dto.uniteId) {
-    const unite = await this.uniteRepository
-      .createQueryBuilder('unite')
-      .where('LOWER(unite.nom) = LOWER(:nom)', { nom: dto.uniteId })
-      .getOne();
-    if (!unite) throw new NotFoundException(`Unité "${dto.uniteId}" non trouvée.`);
-    produit.uniteId = unite.nom;
-  }
+ 
 
-  if (dto.categorieId) {
-    const categorie = await this.categorieProduitRepository
-      .createQueryBuilder('categorie')
-      .where('LOWER(categorie.nom) = LOWER(:nom)', { nom: dto.categorieId })
-      .getOne();
-    if (!categorie) throw new NotFoundException(`Catégorie "${dto.categorieId}" non trouvée.`);
-    produit.categorieId = categorie.id;
-  }
+ if (dto.categorieId) {
+  produit.categorie = { id: Number(dto.categorieId) } as CategorieProduit;
+}
+
+produit.unite = { id: dto.uniteId } as Unite;
+
 
   if (imageFilenames && imageFilenames.length > 0) {
     produit.images = imageFilenames;
   }
+ 
 
   return this.produitRepository.save(produit);
 }
@@ -141,36 +133,10 @@ export class ProduitService {
         prix_unitaire: 1.20,
         tva: 5.5,
         colisage: 12,
-        uniteId: 'Litre',
+        uniteId: 66,
         categorieId: 'Bio'
       },
-      {
-        nom: 'Pain Complet',
-        description: 'Pain complet aux céréales',
-        prix_unitaire: 2.50,
-        tva: 5.5,
-        colisage: 1,
-        uniteId: 'Pièce',
-        categorieId: 'Bio'
-      },
-      {
-        nom: 'Eau Minérale 1.5L',
-        description: 'Eau minérale naturelle',
-        prix_unitaire: 0.80,
-        tva: 5.5,
-        colisage: 6,
-        uniteId: 'Litre',
-        categorieId: 'Boissons'
-      },
-      {
-        nom: 'Yaourt Nature',
-        description: 'Yaourt nature bio',
-        prix_unitaire: 0.95,
-        tva: 5.5,
-        colisage: 4,
-        uniteId: 'Pièce',
-        categorieId: 'Crèmerie'
-      }
+      
     ];
 
     const createdProducts: Produit[] = [];

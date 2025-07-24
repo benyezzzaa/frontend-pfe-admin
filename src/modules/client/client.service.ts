@@ -24,10 +24,33 @@ export class ClientService {
   private categorieClientRepository: Repository<CategorieClient>,
   ) {}
 
+  // ✅ Validation SIRET (algorithme de Luhn modifié)
+  private validateSIRET(siret: string): boolean {
+    if (!siret || siret.length !== 14) return false;
+    
+    let sum = 0;
+    for (let i = 0; i < 13; i++) {
+      let digit = parseInt(siret[i]);
+      if (i % 2 === 1) {
+        digit *= 2;
+        if (digit > 9) digit -= 9;
+      }
+      sum += digit;
+    }
+    
+    const checkDigit = (10 - (sum % 10)) % 10;
+    return checkDigit === parseInt(siret[13]);
+  }
+
   // ✅ Ajouter un client
   async createClient(dto: CreateClientDto, user: User): Promise<Client> {
     if (user.role !== 'commercial') {
       throw new ForbiddenException('Seuls les commerciaux peuvent ajouter des clients.');
+    }
+
+    // Validation SIRET simple (14 chiffres)
+    if (dto.codeFiscale && !/^\d{14}$/.test(dto.codeFiscale)) {
+      throw new BadRequestException('Le SIRET doit contenir exactement 14 chiffres.');
     }
 
     let categorie: CategorieClient | null = null;
@@ -89,6 +112,11 @@ export class ClientService {
 
     if (user.role === 'commercial' && client.commercial?.id !== user.id) {
       throw new ForbiddenException('Vous ne pouvez modifier que vos propres clients.');
+    }
+
+    // Validation SIRET simple (14 chiffres)
+    if (dto.codeFiscale && !/^\d{14}$/.test(dto.codeFiscale)) {
+      throw new BadRequestException('Le SIRET doit contenir exactement 14 chiffres.');
     }
 
     // Nettoyer le numéro de téléphone des espaces

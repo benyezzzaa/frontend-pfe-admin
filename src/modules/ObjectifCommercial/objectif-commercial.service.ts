@@ -57,11 +57,81 @@ export class ObjectifCommercialService {
     return this.objectifRepo.save(objectif);
   }
 
-  async findAll(): Promise<ObjectifCommercial[]> {
-    return this.objectifRepo.find({
+  async findAll(): Promise<any[]> {
+    console.log('🔍 findAll() appelé - Récupération de tous les objectifs');
+    
+    const objectifs = await this.objectifRepo.find({
       relations: ['commercial'],
       order: { id: 'DESC' },
     });
+
+    console.log(`📊 ${objectifs.length} objectifs trouvés`);
+
+    // Calculer les ventes pour chaque objectif
+    const result = await Promise.all(objectifs.map(async (obj) => {
+      let montantRealise = 0;
+      
+      if (obj.commercial) {
+        console.log(`💰 Calcul des ventes pour ${obj.commercial.nom} ${obj.commercial.prenom} - Objectif: ${obj.mission}`);
+        console.log(`📅 Période: ${obj.dateDebut} à ${obj.dateFin}`);
+        
+        // Calculer les ventes du commercial pour la période de l'objectif
+        // Essayer d'abord avec date_validation, sinon utiliser date_creation
+        let ventesResult = await this.commandeRepo
+          .createQueryBuilder('commande')
+          .where('commande.commercialId = :userId', { userId: obj.commercial.id })
+          .andWhere('commande.statut = :statut', { statut: 'validee' })
+          .andWhere('commande.date_validation BETWEEN :dateDebut AND :dateFin', { 
+            dateDebut: obj.dateDebut, 
+            dateFin: obj.dateFin 
+          })
+          .select('SUM(commande.prix_total_ttc)', 'total')
+          .getRawOne();
+
+        // Si pas de résultats avec date_validation, essayer avec date_creation
+        if (!ventesResult || parseFloat(ventesResult.total || '0') === 0) {
+          console.log(`⚠️ Pas de ventes avec date_validation, essai avec date_creation`);
+          ventesResult = await this.commandeRepo
+            .createQueryBuilder('commande')
+            .where('commande.commercialId = :userId', { userId: obj.commercial.id })
+            .andWhere('commande.statut = :statut', { statut: 'validee' })
+            .andWhere('commande.dateCreation BETWEEN :dateDebut AND :dateFin', { 
+              dateDebut: obj.dateDebut, 
+              dateFin: obj.dateFin 
+            })
+            .select('SUM(commande.prix_total_ttc)', 'total')
+            .getRawOne();
+        }
+
+        montantRealise = parseFloat(ventesResult?.total || '0');
+        
+        // Debug: vérifier toutes les commandes du commercial
+        const allCommandes = await this.commandeRepo
+          .createQueryBuilder('commande')
+          .where('commande.commercialId = :userId', { userId: obj.commercial.id })
+          .select(['commande.statut', 'commande.prix_total_ttc', 'commande.dateCreation', 'commande.date_validation'])
+          .getMany();
+        
+        console.log(`📦 Total commandes du commercial: ${allCommandes.length}`);
+        console.log(`📊 Statuts des commandes:`, allCommandes.map(cmd => `${cmd.statut}: ${cmd.prix_total_ttc}€`));
+        
+        console.log(`💶 Ventes calculées: ${montantRealise}€ / Objectif: ${obj.montantCible}€`);
+        console.log(`✅ Atteint: ${montantRealise >= obj.montantCible}`);
+      }
+
+      const resultObj = {
+        ...obj,
+        montantRealise,
+        isAtteint: obj.montantCible ? montantRealise >= obj.montantCible : false,
+      };
+
+      console.log(`📋 Objectif final: ${resultObj.mission} - Réalisé: ${resultObj.montantRealise}€ - Atteint: ${resultObj.isAtteint}`);
+      
+      return resultObj;
+    }));
+
+    console.log(`✅ findAll() terminé - ${result.length} objectifs avec ventes calculées`);
+    return result;
   }
 
   async toggleStatus(id: number): Promise<ObjectifCommercial> {

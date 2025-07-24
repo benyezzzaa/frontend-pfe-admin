@@ -43,7 +43,7 @@ export class ProduitController {
         prix: { type: 'number' },
         prix_unitaire: { type: 'number' },
         categorieId: { type: 'string' },
-        uniteId: { type: 'string' },
+        uniteId: { type: 'number' },
         images: {
           type: 'array',
           items: { type: 'string', format: 'binary' },

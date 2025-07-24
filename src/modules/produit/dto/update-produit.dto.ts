@@ -29,5 +29,7 @@ export class UpdateProduitDto {
   categorieId?: string;
 
   @IsOptional()
-  uniteId?: string;
+  @Type(() => Number)
+  @IsNumber()
+  uniteId?: number;
 }

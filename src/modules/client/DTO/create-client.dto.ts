@@ -3,10 +3,15 @@ import { IsBoolean, IsNumber, IsOptional, IsString, Matches } from 'class-valida
 import { Column } from 'typeorm';
 
 export class CreateClientDto {
-  @ApiProperty({ example: 'Ali' })
+  @ApiProperty({ example: 'Entreprise ABC SARL' })
   @IsOptional()
   @IsString()
   nom?: string;
+
+  @ApiProperty({ example: 'Ali Ben Salah' })
+  @IsOptional()
+  @IsString()
+  prenom?: string;
  @ApiProperty({ example: 36.8065, required: false })
 @IsOptional()
 @IsNumber()
@@ -16,10 +21,10 @@ latitude?: number;
 @IsOptional()
 @IsNumber()
 longitude?: number;
-  @ApiProperty({ example: 'Ben Salah' })
+  @ApiProperty({ example: 'Ali Ben Salah' })
   @IsOptional()
   @IsString()
-  prenom?: string;
+  responsable?: string;
 
   @ApiProperty({ example: 'ali@example.com' })
   @IsOptional()
@@ -37,10 +42,16 @@ telephone: string;
   @IsOptional()
   @IsString()
   adresse?: string;
-  @ApiProperty({ example: '1234567890123', description: 'Code fiscal (13 chiffres)' })
-@IsOptional()
-@IsString()
-codeFiscale?: string;
+  @ApiProperty({ 
+    example: '12345678901234', 
+    description: 'SIRET (14 chiffres) - Numéro fiscal français' 
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{14}$/, {
+    message: 'Le SIRET doit contenir exactement 14 chiffres.',
+  })
+  codeFiscale?: string;
   @ApiProperty({ example: true })
   @IsOptional()
   @IsBoolean()
