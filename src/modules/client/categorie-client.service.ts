@@ -17,7 +17,10 @@ export class CategorieClientService {
       throw new ConflictException('Cette catégorie existe déjà');
     }
 
-    const newCategorie = this.categorieRepo.create(dto);
+    const newCategorie = this.categorieRepo.create({
+      ...dto,
+      isActive: true,
+    });
     return this.categorieRepo.save(newCategorie);
   }
 

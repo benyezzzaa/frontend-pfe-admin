@@ -14,7 +14,10 @@ export class PromotionService {
   ) {}
 
   async create(dto: CreatePromotionDto): Promise<Promotion> {
-    const promo = this.promoRepo.create(dto);
+    const promo = this.promoRepo.create({
+      ...dto,
+      isActive: true,
+    });
     return await this.promoRepo.save(promo);
   }
 async findActive(): Promise<Promotion[]> {

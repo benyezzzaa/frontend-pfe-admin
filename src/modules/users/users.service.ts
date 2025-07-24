@@ -74,6 +74,7 @@ export class UsersService {
       latitude: coords.lat,
       longitude: coords.lon,
       role: 'commercial',
+      isActive: true,
     });
 
     return await this.userRepository.save(commercial);
@@ -95,6 +96,7 @@ export class UsersService {
       tel: cleanTel,
       password: hashed,
       role: 'admin',
+      isActive: true,
     });
 
     return this.userRepository.save(admin);

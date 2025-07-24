@@ -20,7 +20,10 @@ export class UniteService {
     if (exist) {
       throw new NotFoundException("Cette unité existe déjà (insensible à la casse)");
     }
-    const unite = this.uniteRepository.create(dto);
+    const unite = this.uniteRepository.create({
+      ...dto,
+      isActive: true,
+    });
     return await this.uniteRepository.save(unite);
   }
 
