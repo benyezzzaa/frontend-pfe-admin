@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -119,6 +120,16 @@ export class ClientService {
     // Validation SIRET simple (14 chiffres)
     if (dto.codeFiscale && !/^\d{14}$/.test(dto.codeFiscale)) {
       throw new BadRequestException('Le SIRET doit contenir exactement 14 chiffres.');
+    }
+
+    // ✅ Vérifier si le SIRET existe déjà (sauf pour le client actuel)
+    if (dto.codeFiscale && dto.codeFiscale !== client.codeFiscale) {
+      const existingClient = await this.clientRepository.findOneBy({ 
+        codeFiscale: dto.codeFiscale 
+      });
+      if (existingClient) {
+        throw new ConflictException('Un client avec ce numéro SIRET existe déjà.');
+      }
     }
 
     // Nettoyer le numéro de téléphone des espaces
