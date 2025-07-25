@@ -81,7 +81,9 @@ export class ClientService {
 
   // ✅ Voir tous les clients
   async getAllClients(): Promise<Client[]> {
-    return this.clientRepository.find();
+    return this.clientRepository.find({
+      relations: ['categorie', 'commercial'],
+    });
   }
 
   // ✅ Voir un client spécifique
@@ -92,7 +94,7 @@ export class ClientService {
 
     const client = await this.clientRepository.findOne({
       where: { id },
-      relations: ['commercial'],
+      relations: ['categorie', 'commercial'],
     });
 
     if (!client) {
@@ -124,8 +126,42 @@ export class ClientService {
       dto.telephone = dto.telephone.replace(/\s+/g, '');
     }
 
-    Object.assign(client, dto);
-    return this.clientRepository.save(client);
+    // Gérer la mise à jour de la catégorie
+    if (dto.categorieId) {
+      const categorie = await this.categorieClientRepository.findOneBy({ id: dto.categorieId });
+      if (!categorie) {
+        throw new NotFoundException('Catégorie non trouvée');
+      }
+      client.categorie = categorie;
+    }
+
+    // Mettre à jour les autres propriétés
+    Object.assign(client, {
+      nom: dto.nom,
+      prenom: dto.prenom,
+      email: dto.email,
+      telephone: dto.telephone,
+      adresse: dto.adresse,
+      codeFiscale: dto.codeFiscale,
+      estFidele: dto.estFidele,
+      latitude: dto.latitude,
+      longitude: dto.longitude,
+      responsable: dto.responsable,
+    });
+
+    const savedClient = await this.clientRepository.save(client);
+
+    // Retourner le client avec les relations chargées
+    const clientFinal = await this.clientRepository.findOne({
+      where: { id: savedClient.id },
+      relations: ['categorie', 'commercial'],
+    });
+
+    if (!clientFinal) {
+      throw new NotFoundException('Client non trouvé après mise à jour');
+    }
+
+    return clientFinal;
   }
 
   // ✅ Supprimer un client
@@ -184,7 +220,7 @@ async getCategoriesDuCommercial(user: User): Promise<CategorieClient[]> {
 
     return this.clientRepository.find({
       where: { commercial: { id: user.id } },
-      relations: ['commercial'],
+      relations: ['categorie', 'commercial'],
     });
   }
 
@@ -192,7 +228,7 @@ async getCategoriesDuCommercial(user: User): Promise<CategorieClient[]> {
   async getClientsByCommercialId(commercialId: number): Promise<Client[]> {
     return this.clientRepository.find({
       where: { commercial: { id: commercialId } },
-      relations: ['commercial'],
+      relations: ['categorie', 'commercial'],
     });
   }
 
