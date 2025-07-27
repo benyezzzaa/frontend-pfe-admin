@@ -11,7 +11,8 @@ import {
   UseGuards,
   Put,
   ParseIntPipe,
-  Request
+  Request,
+  BadRequestException
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -20,6 +21,7 @@ import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { SetRoles } from '../auth/setRoles.decorator';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -61,6 +63,31 @@ export class UsersController {
     return this.usersService.updateStatus(id, body.isActive);
   }
 
+  // ✅ Endpoint pour que le commercial modifie son propre profil
+@Put('profile')
+@SetRoles('commercial')
+@ApiOperation({ summary: 'Modifier son propre profil (mot de passe/téléphone)' })
+async updateProfile(
+  @Request() req,
+  @Body() dto: UpdateProfileDto
+) {
+  // Permettre la mise à jour du mot de passe seul ou du téléphone seul
+  if (!dto.password && !dto.tel) {
+    throw new BadRequestException('Aucune donnée à mettre à jour');
+  }
+
+  // Nettoyer les champs undefined/null
+  if (dto.tel === null || dto.tel === undefined) {
+    delete dto.tel;
+  }
+  
+  if (dto.password === null || dto.password === undefined) {
+    delete dto.password;
+  }
+
+  return this.usersService.updateOwnProfile(req.user.id, dto);
+}
+
   // ✅ Modifier un utilisateur
  @Put(':id')
   @SetRoles('admin', 'commercial')
@@ -89,16 +116,5 @@ export class UsersController {
   @ApiOperation({ summary: 'Obtenir la position de tous les commerciaux' })
   getCommercialsWithPosition() {
     return this.usersService.getAllCommercialsWithPosition();
-  }
-
-  // ✅ Endpoint pour que le commercial modifie son propre profil
-  @Put('profile')
-  @SetRoles('commercial')
-  @ApiOperation({ summary: 'Modifier son propre profil (commercial)' })
-  async updateOwnProfile(
-    @Request() req,
-    @Body() updateUserDto: UpdateUserDto,
-  ) {
-    return this.usersService.updateOwnProfile(req.user.id, updateUserDto);
   }
 }

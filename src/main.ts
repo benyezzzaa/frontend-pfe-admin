@@ -22,6 +22,8 @@ async function bootstrap() {
       whitelist: true,
       transform: true,
       forbidNonWhitelisted: true,
+      skipNullProperties: true,           // ✅ << Ajoute ceci
+      skipUndefinedProperties: true
     })
   );
 

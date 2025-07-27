@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { User } from './users.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import * as bcrypt from 'bcryptjs';
 import axios from 'axios';
 
@@ -14,7 +15,7 @@ export class UsersService {
     private userRepository: Repository<User>,
   ) {}
 
-  // ✅ Géocodage OpenStreetMap
+  // ✅ Géocodage d’adresse avec OpenStreetMap
   private async geocodeAdresse(adresse: string): Promise<{ lat: number; lon: number }> {
     const res = await axios.get('https://nominatim.openstreetmap.org/search', {
       params: {
@@ -37,7 +38,7 @@ export class UsersService {
     };
   }
 
-  // ✅ Créer un commercial avec géocodage
+  // ✅ Création d’un commercial
   async createCommercial(createUserDto: CreateUserDto): Promise<User> {
     const existingUser = await this.userRepository.findOne({
       where: { email: createUserDto.email },
@@ -47,7 +48,7 @@ export class UsersService {
       throw new BadRequestException('Email déjà utilisé');
     }
 
-    if (!createUserDto.adresse || createUserDto.adresse.trim() === '') {
+    if (!createUserDto.adresse?.trim()) {
       throw new BadRequestException('Adresse obligatoire pour géolocaliser le commercial.');
     }
 
@@ -61,16 +62,12 @@ export class UsersService {
       throw new BadRequestException("Adresse invalide ou non trouvée");
     }
 
-    // Nettoyer le numéro de téléphone des espaces
-    const cleanTel = createUserDto.tel ? createUserDto.tel.replace(/\s+/g, '') : undefined;
+    const cleanTel = createUserDto.tel?.replace(/\s+/g, '');
 
     const commercial = this.userRepository.create({
-      nom: createUserDto.nom,
-      prenom: createUserDto.prenom,
-      email: createUserDto.email,
-      password: hashedPassword,
+      ...createUserDto,
       tel: cleanTel,
-      adresse: createUserDto.adresse,
+      password: hashedPassword,
       latitude: coords.lat,
       longitude: coords.lon,
       role: 'commercial',
@@ -80,7 +77,7 @@ export class UsersService {
     return await this.userRepository.save(commercial);
   }
 
-  // ✅ Créer un admin
+  // ✅ Création d’un administrateur
   async createAdmin(dto: CreateUserDto): Promise<User> {
     const existing = await this.userRepository.findOne({ where: { email: dto.email } });
     if (existing) throw new BadRequestException('Email déjà utilisé');
@@ -88,8 +85,7 @@ export class UsersService {
     const salt = await bcrypt.genSalt();
     const hashed = await bcrypt.hash(dto.password, salt);
 
-    // Nettoyer le numéro de téléphone des espaces
-    const cleanTel = dto.tel ? dto.tel.replace(/\s+/g, '') : undefined;
+    const cleanTel = dto.tel?.replace(/\s+/g, '');
 
     const admin = this.userRepository.create({
       ...dto,
@@ -102,6 +98,7 @@ export class UsersService {
     return this.userRepository.save(admin);
   }
 
+  // ✅ Trouver tous les utilisateurs
   async findAll(): Promise<User[]> {
     return this.userRepository.find();
   }
@@ -111,10 +108,9 @@ export class UsersService {
   }
 
   async findByRole(role?: string) {
-    if (role) {
-      return this.userRepository.find({ where: { role } });
-    }
-    return this.userRepository.find();
+    return role
+      ? this.userRepository.find({ where: { role } })
+      : this.userRepository.find();
   }
 
   async findAllCommerciaux(): Promise<User[]> {
@@ -124,25 +120,20 @@ export class UsersService {
     });
   }
 
+  // ✅ Modification par l’admin ou le commercial (admin peut modifier tout)
   async updateUser(id: number, updateUserDto: UpdateUserDto, currentUser?: any) {
     const user = await this.userRepository.findOneBy({ id });
+    if (!user) throw new NotFoundException('Utilisateur non trouvé');
 
-    if (!user) {
-      throw new NotFoundException('Utilisateur non trouvé');
-    }
-
-    // Si c'est un commercial, il ne peut modifier que son propre profil
-    if (currentUser && currentUser.role === 'commercial' && currentUser.id !== id) {
+    if (currentUser?.role === 'commercial' && currentUser.id !== id) {
       throw new BadRequestException("Vous ne pouvez modifier que votre propre profil.");
     }
 
-    // Si c'est un commercial, empêcher la modification du rôle
-    if (currentUser && currentUser.role === 'commercial' && updateUserDto.role && updateUserDto.role !== user.role) {
+    if (currentUser?.role === 'commercial' && updateUserDto.role && updateUserDto.role !== user.role) {
       throw new BadRequestException("Vous ne pouvez pas modifier votre rôle.");
     }
 
-    // Si c'est un commercial, empêcher la modification du mot de passe via cet endpoint
-    if (currentUser && currentUser.role === 'commercial') {
+    if (currentUser?.role === 'commercial') {
       delete updateUserDto.password;
     }
 
@@ -156,12 +147,10 @@ export class UsersService {
       }
     }
 
-    // Nettoyer le numéro de téléphone des espaces si fourni
     if (updateUserDto.tel) {
       updateUserDto.tel = updateUserDto.tel.replace(/\s+/g, '');
     }
 
-    // Hasher le mot de passe s'il est fourni (seulement pour les admins)
     if (updateUserDto.password && (!currentUser || currentUser.role === 'admin')) {
       const salt = await bcrypt.genSalt();
       updateUserDto.password = await bcrypt.hash(updateUserDto.password, salt);
@@ -171,9 +160,11 @@ export class UsersService {
     return this.userRepository.save(user);
   }
 
+  // ✅ Modifier uniquement le statut (actif/inactif)
   async updateStatus(id: number, isActive: boolean) {
     const user = await this.userRepository.findOneBy({ id });
     if (!user) throw new NotFoundException('Utilisateur introuvable');
+
     user.isActive = isActive;
     return this.userRepository.save(user);
   }
@@ -188,42 +179,42 @@ export class UsersService {
 
   async updatePosition(id: number, latitude: number, longitude: number) {
     const user = await this.userRepository.findOneBy({ id });
-    if (!user) {
-      throw new NotFoundException(`Utilisateur ${id} introuvable`);
-    }
+    if (!user) throw new NotFoundException(`Utilisateur ${id} introuvable`);
 
     user.latitude = latitude;
     user.longitude = longitude;
-    return await this.userRepository.save(user);
+    return this.userRepository.save(user);
   }
 
   async getAllCommercialsWithPosition() {
-    return await this.userRepository.find({
+    return this.userRepository.find({
       where: { role: 'commercial', isActive: true },
       select: ['id', 'nom', 'prenom', 'latitude', 'longitude'],
     });
   }
 
-  // ✅ Méthode pour que le commercial modifie son propre profil
-  async updateOwnProfile(userId: number, updateUserDto: UpdateUserDto) {
+  // ✅ Commercial met à jour son propre profil
+ async updateOwnProfile(userId: number, updateUserDto: UpdateProfileDto) {
+
+    console.log('📦 updateUserDto recu :', updateUserDto);
     const user = await this.userRepository.findOneBy({ id: userId });
+    if (!user) throw new NotFoundException('Utilisateur non trouvé');
 
-    if (!user) {
-      throw new NotFoundException('Utilisateur non trouvé');
-    }
-
-    // Empêcher la modification du rôle
-    if (updateUserDto.role && updateUserDto.role !== user.role) {
+    // 🔒 Empêcher la modification du rôle même si injecté manuellement
+    if ((updateUserDto as any).role && (updateUserDto as any).role !== user.role) {
       throw new BadRequestException("Vous ne pouvez pas modifier votre rôle.");
     }
 
-    // Nettoyer le numéro de téléphone des espaces si fourni
+    // Nettoyage numéro de téléphone
     if (updateUserDto.tel) {
-      updateUserDto.tel = updateUserDto.tel.replace(/\s+/g, '');
+      updateUserDto.tel = updateUserDto.tel.replace(/[^\d+]/g, '').replace(/^33/, '0');
     }
 
-    // Ne pas permettre la modification du mot de passe via cet endpoint
-    delete updateUserDto.password;
+    // Hachage si mot de passe fourni
+    if (updateUserDto.password) {
+      const salt = await bcrypt.genSalt();
+      updateUserDto.password = await bcrypt.hash(updateUserDto.password, salt);
+    }
 
     Object.assign(user, updateUserDto);
     return this.userRepository.save(user);
