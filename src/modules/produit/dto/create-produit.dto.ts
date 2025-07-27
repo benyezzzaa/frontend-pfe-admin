@@ -36,6 +36,7 @@ colisage: number;
   categorieId: string;
 
   @IsNotEmpty()
-  @IsString()
-  uniteId: number; // ⚠️ string car c'est le nom de l'unité
+@Type(() => Number)
+@IsNumber({}, { message: 'L\'unité doit être un identifiant numérique' })
+uniteId: number;
 }
